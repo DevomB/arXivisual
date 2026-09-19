@@ -8,5 +8,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 1,
     },
+    {
+      // The gallery gains a card whenever a paper finishes processing.
+      url: "https://arxivisual.org/explore",
+      lastModified: new Date(),
+      changeFrequency: "daily",
+      priority: 0.8,
+    },
   ];
 }

@@ -8,7 +8,6 @@
  * initialises and no analytics request is ever made.
  */
 import posthog from "posthog-js";
-import Clarity from "@microsoft/clarity";
 import { registerAnalytics } from "@/lib/analytics";
 import { CLARITY_PROJECT_ID, applyStoredClarityConsent } from "@/lib/clarity-consent";
 
@@ -39,16 +38,30 @@ if (POSTHOG_KEY) {
     person_profiles: "never",
     autocapture: false,
     capture_pageleave: true,
+    // Frontend error visibility — nothing else reports browser errors, least
+    // of all on the self-hosted server. Uncaught errors and unhandled
+    // rejections become $exception events, with the same cookieless,
+    // person-less identity as every other event. Errors swallowed by the
+    // React error boundaries are forwarded by hand: reportError() in every
+    // boundary file — app/error.tsx, app/abs/[...id]/error.tsx and
+    // app/global-error.tsx. A new error.tsx has to do the same; a nested
+    // boundary's error never bubbles to the ones above it.
+    capture_exceptions: true,
   });
-  registerAnalytics((event, props) => {
-    posthog.capture(event, props);
-  });
+  registerAnalytics(
+    (event, props) => {
+      posthog.capture(event, props);
+    },
+    (error, props) => {
+      posthog.captureException(error, props);
+    },
+  );
 }
 
 if (CLARITY_PROJECT_ID) {
-  // Clarity loads regardless of consent and adapts to the consent signal
-  // (its docs ask for the tag as early as possible). Cookies wait for Accept
-  // in components/ConsentBar.tsx; a remembered answer is replayed here.
-  Clarity.init(CLARITY_PROJECT_ID);
+  // Clarity records sessions as soon as its tag loads, so the tag itself
+  // waits for consent: this only starts it for a visitor who already clicked
+  // Accept on an earlier visit. Everyone else gets it from the Accept handler
+  // in components/ConsentBar.tsx — or never.
   applyStoredClarityConsent();
 }

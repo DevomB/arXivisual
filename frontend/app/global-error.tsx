@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
+import { reportError } from "@/lib/analytics";
+
 /**
  * Last-resort boundary for failures in the root layout itself. Must render
  * its own <html>/<body>; keeps the background black so a crash never
@@ -12,6 +15,12 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    // instrumentation-client.ts runs before hydration, so the sink (if any)
+    // is registered even though the root layout never mounted.
+    reportError(error, { boundary: "global", digest: error.digest });
+  }, [error]);
+
   return (
     <html lang="en">
       <body style={{ margin: 0, background: "#000", color: "rgba(255,255,255,0.8)", fontFamily: "system-ui, sans-serif" }}>
