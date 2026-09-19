@@ -8,8 +8,9 @@ import { getStoredConsent, setClarityConsent, type ConsentChoice } from "@/lib/c
  * Cookie notice for Microsoft Clarity (session replays + heatmaps). Rendered
  * by app/layout.tsx only when NEXT_PUBLIC_CLARITY_PROJECT_ID is set.
  *
- * Clarity runs cookieless until the visitor accepts; Decline keeps it that
- * way. Either answer is remembered in localStorage and the bar stays hidden.
+ * Clarity is not loaded at all until the visitor accepts (lib/clarity-consent
+ * injects the tag from the Accept handler); Decline keeps it that way. Either
+ * answer is remembered in localStorage and the bar stays hidden.
  * PostHog is cookieless by construction and needs no notice.
  *
  * Never blocks the page: a fixed card at the bottom (bottom-right from the
@@ -62,8 +63,9 @@ export function ConsentBar() {
     >
       <div className="pointer-events-auto flex w-full max-w-2xl flex-col gap-3 sm:max-w-md rounded-2xl border border-white/[0.08] bg-black/70 p-4 shadow-lg shadow-black/30 backdrop-blur-xl sm:flex-row sm:items-center sm:gap-5 sm:px-5">
         <p className="text-sm leading-relaxed text-white/50">
-          We use Microsoft Clarity to see how the site is used (session replays,
-          heatmaps). It sets cookies only if you accept.{" "}
+          We&apos;d like to use Microsoft Clarity to see how the site is used
+          (session replays, heatmaps). It loads, and sets cookies, only if you
+          accept.{" "}
           <a
             href="https://learn.microsoft.com/clarity/setup-and-installation/clarity-cookies"
             target="_blank"

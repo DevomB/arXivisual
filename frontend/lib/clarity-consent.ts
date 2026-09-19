@@ -1,13 +1,14 @@
 /**
- * Microsoft Clarity cookie consent — the one place that talks to Clarity's
- * consent API and remembers the visitor's answer.
+ * Microsoft Clarity consent — the one place that loads the Clarity tag, talks
+ * to its consent API and remembers the visitor's answer.
  *
- * Clarity's Consent Mode starts EEA/UK/CH visitors (and everyone, once the
- * project has Consent Mode switched on) in "denied": the tag runs cookieless
- * until it is told otherwise. components/ConsentBar.tsx is the notice; on
- * Accept we grant analytics storage only — ads storage stays denied — and on
- * every later page load we replay the stored answer once, before Clarity
- * would set anything (per the Clarity consent docs).
+ * Clarity records sessions (replays, heatmaps) from the moment its tag loads;
+ * its Consent Mode only decides whether it may also set cookies. So consent
+ * here gates the tag itself, not just cookie storage: nothing is fetched from
+ * clarity.ms and nothing is recorded until the visitor clicks Accept in
+ * components/ConsentBar.tsx. Decline — or no answer yet — means Clarity never
+ * loads. On Accept we grant analytics storage only; ads storage stays denied.
+ * A stored "granted" is replayed once on every later page load.
  *
  * Client only. No-op when NEXT_PUBLIC_CLARITY_PROJECT_ID is unset.
  */
@@ -41,10 +42,24 @@ export function getStoredConsent(): ConsentChoice | null {
   }
 }
 
+/**
+ * Inject the Clarity tag. Private on purpose: the only callers are the two
+ * "consent is granted" paths below. Clarity.init() is idempotent (it checks
+ * for its own script element), so Accept after a replayed grant is harmless.
+ */
+function startClarity(): void {
+  if (typeof window === "undefined" || !CLARITY_PROJECT_ID) return;
+  try {
+    Clarity.init(CLARITY_PROJECT_ID);
+  } catch {
+    // Analytics must never break the page.
+  }
+}
+
 function signalConsent(choice: ConsentChoice): void {
   // Clarity.init() installs the window.clarity queue, so a call made before
   // the tag finishes loading is replayed, not lost. Without init (no project
-  // id) there is nothing to talk to.
+  // id, or consent never granted) there is nothing to talk to.
   if (typeof window === "undefined" || typeof window.clarity !== "function") return;
   try {
     Clarity.consentV2({ ad_Storage: "denied", analytics_Storage: choice });
@@ -53,24 +68,26 @@ function signalConsent(choice: ConsentChoice): void {
   }
 }
 
-/** Persist the visitor's choice and tell Clarity. */
+/** Persist the visitor's choice; on Accept, load Clarity and tell it. */
 export function setClarityConsent(choice: ConsentChoice): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, choice);
   } catch {
     // Private mode / blocked storage: the bar simply asks again next visit.
   }
+  // Accept starts recording from this page view on. Decline loads nothing;
+  // the signal below only matters if the tag is somehow already running.
+  if (choice === "granted") startClarity();
   signalConsent(choice);
 }
 
 /**
- * Once per page load, right after Clarity.init(): replay a stored choice, or
- * — for a first-time visitor — signal "denied" so Clarity stays cookieless
- * everywhere until Accept. Clarity's own default is "denied" only for
- * EEA/UK/CH visitors (Consent Mode); this makes the bar's promise ("it sets
- * cookies only if you accept") true for everyone, whatever the project
- * setting says.
+ * Once per page load, from instrumentation-client.ts: a visitor who accepted
+ * on an earlier visit gets Clarity (with analytics storage granted); everyone
+ * else — declined, or not asked yet — gets nothing until they click Accept.
  */
 export function applyStoredClarityConsent(): void {
-  signalConsent(getStoredConsent() ?? "denied");
+  if (getStoredConsent() !== "granted") return;
+  startClarity();
+  signalConsent("granted");
 }
