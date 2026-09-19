@@ -9,16 +9,41 @@ import type { NextConfig } from "next";
 const POSTHOG_ENABLED = Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY);
 const POSTHOG_REGION = (process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "").includes("eu.") ? "eu" : "us";
 
+// Baseline response headers for every path. Deliberately no CSP here:
+// Turnstile, the PostHog /ingest proxy, R2-hosted video and KaTeX all need
+// allowances, and a wrong policy is an outage rather than a hardening.
+// HSTS carries no includeSubDomains/preload — those commit every subdomain of
+// arxivisual.org and are not undoable on a whim. Browsers ignore HSTS over
+// plain http, so local `next start` is unaffected.
+const SECURITY_HEADERS = [
+  { key: "Strict-Transport-Security", value: "max-age=63072000" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+];
+
 const nextConfig: NextConfig = {
   // Self-hosted on Azure Container Apps: `next build` emits a minimal Node
   // server plus only the files it traces into .next/standalone, which the
   // Dockerfile copies into a small runtime image (no node_modules, no Vercel).
   output: "standalone",
 
+  // Don't advertise the framework in `X-Powered-By`.
+  poweredByHeader: false,
+
+  // Nothing in the app uses next/image, but the optimizer endpoint is live on
+  // any Next server regardless: /_next/image would resize and re-encode on
+  // request, on our CPU. `unoptimized` makes that route answer 404.
+  images: { unoptimized: true },
+
   // PostHog posts to /ingest/e/ (trailing slash); Next would otherwise 308 it
-  // to /ingest/e before the rewrite. Side effect: /explore/ now answers 200
-  // instead of redirecting to /explore (the app never links with a slash).
+  // to /ingest/e before the rewrite. The flag is global, so proxy.ts restores
+  // the redirect for every other path (/explore/ → /explore).
   skipTrailingSlashRedirect: true,
+
+  async headers() {
+    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+  },
 
   async rewrites() {
     if (!POSTHOG_ENABLED) return [];
