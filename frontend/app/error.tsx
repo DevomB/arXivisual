@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { reportError } from "@/lib/analytics";
 
 /**
  * Route-level error boundary for every page under the root layout. Without
@@ -17,6 +18,9 @@ export default function RootError({
 }) {
   useEffect(() => {
     console.error("Page crashed:", error);
+    // The boundary caught it, so window.onerror never fires — forward it.
+    // No-op unless PostHog is initialised.
+    reportError(error, { boundary: "route", digest: error.digest });
   }, [error]);
 
   return (

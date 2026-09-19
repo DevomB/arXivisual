@@ -214,8 +214,12 @@ export function PaperPage({
     setStartingJob(true);
 
     try {
-      track("paper_start", { arxiv_id: arxivId });
       const response = await processArxivPaper(arxivId, turnstileToken);
+      // Emitted once the job exists, not on click: job_id is the only key the
+      // server-side events (paper_accepted / paper_completed /
+      // paper_failed_server) carry, so without it the browser and server
+      // funnels cannot be joined.
+      track("paper_start", { arxiv_id: arxivId, job_id: response.job_id });
       setJobId(response.job_id);
       setState({
         type: "processing",
@@ -230,6 +234,12 @@ export function PaperPage({
       });
     } catch (err) {
       console.error("Error starting processing:", err);
+      // No job was created (rate limit, Turnstile, budget fuse, network), so
+      // there is no paper_start; keep the rejected click visible on its own.
+      track("paper_start_rejected", {
+        arxiv_id: arxivId,
+        reason: (err instanceof Error ? err.message : String(err)).slice(0, 200),
+      });
       setState({
         type: "error",
         message: err instanceof Error ? err.message : "Failed to start processing",
@@ -316,11 +326,11 @@ export function PaperPage({
           clearInterval(pollInterval);
           const paper = await getPaper(arxivId);
           if (paper) {
-            track("paper_ready", { arxiv_id: arxivId, videos: countVideos(paper) });
+            track("paper_ready", { arxiv_id: arxivId, job_id: jobId, videos: countVideos(paper) });
             notifier.fire("Your paper is ready", "The visualizations finished rendering — come take a look.");
             setState({ type: "ready", paper });
           } else {
-            track("paper_failed", { arxiv_id: arxivId, reason: "completed_but_paper_missing" });
+            track("paper_failed", { arxiv_id: arxivId, job_id: jobId, reason: "completed_but_paper_missing" });
             setState({ type: "error", message: "Paper processing completed but paper not found" });
           }
         } else if (response.status === "failed") {
@@ -331,6 +341,7 @@ export function PaperPage({
           // partial: the text survived (reader shows it), only videos failed.
           track("paper_failed", {
             arxiv_id: arxivId,
+            job_id: jobId,
             reason: response.error || "unknown",
             partial: paper !== null,
           });

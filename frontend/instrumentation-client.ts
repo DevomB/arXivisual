@@ -39,10 +39,22 @@ if (POSTHOG_KEY) {
     person_profiles: "never",
     autocapture: false,
     capture_pageleave: true,
+    // Frontend error visibility — nothing else reports browser errors, least
+    // of all on the self-hosted server. Uncaught errors and unhandled
+    // rejections become $exception events, with the same cookieless,
+    // person-less identity as every other event. Errors swallowed by the
+    // React error boundaries are forwarded by hand: reportError() in
+    // app/error.tsx and app/global-error.tsx.
+    capture_exceptions: true,
   });
-  registerAnalytics((event, props) => {
-    posthog.capture(event, props);
-  });
+  registerAnalytics(
+    (event, props) => {
+      posthog.capture(event, props);
+    },
+    (error, props) => {
+      posthog.captureException(error, props);
+    },
+  );
 }
 
 if (CLARITY_PROJECT_ID) {
