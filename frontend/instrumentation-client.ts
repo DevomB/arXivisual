@@ -42,8 +42,10 @@ if (POSTHOG_KEY) {
     // of all on the self-hosted server. Uncaught errors and unhandled
     // rejections become $exception events, with the same cookieless,
     // person-less identity as every other event. Errors swallowed by the
-    // React error boundaries are forwarded by hand: reportError() in
-    // app/error.tsx and app/global-error.tsx.
+    // React error boundaries are forwarded by hand: reportError() in every
+    // boundary file — app/error.tsx, app/abs/[...id]/error.tsx and
+    // app/global-error.tsx. A new error.tsx has to do the same; a nested
+    // boundary's error never bubbles to the ones above it.
     capture_exceptions: true,
   });
   registerAnalytics(

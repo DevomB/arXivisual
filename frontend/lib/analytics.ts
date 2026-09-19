@@ -48,11 +48,13 @@ export function track(event: string, props?: AnalyticsProps): void {
 
 /**
  * Report an error that a React error boundary caught (app/error.tsx,
- * app/global-error.tsx). Uncaught errors and unhandled rejections reach the
- * SDK on their own (`capture_exceptions`); a boundary swallows its error
- * before `window.onerror` ever sees it, so those have to be forwarded by
- * hand. Same contract as `track()`: a silent no-op until a sink is
- * registered, and it never throws — least of all from an error page.
+ * app/abs/[...id]/error.tsx, app/global-error.tsx). Uncaught errors and
+ * unhandled rejections reach the SDK on their own (`capture_exceptions`); a
+ * boundary swallows its error before `window.onerror` ever sees it, so those
+ * have to be forwarded by hand — from every boundary file, since a nested
+ * one does not bubble to its parents. Same contract as `track()`: a silent
+ * no-op until a sink is registered, and it never throws — least of all from
+ * an error page.
  */
 export function reportError(error: unknown, props?: AnalyticsProps): void {
   if (typeof window === "undefined" || captureError === null) return;

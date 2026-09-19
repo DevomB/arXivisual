@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { reportError } from "@/lib/analytics";
 
 /**
  * Route-level error boundary for the paper page. Without one, an uncaught
@@ -17,6 +18,10 @@ export default function PaperPageError({
 }) {
   useEffect(() => {
     console.error("Paper page crashed:", error);
+    // This boundary is nested inside app/error.tsx, so the crash never
+    // bubbles to the one that reports — forward it from here too. No-op
+    // unless PostHog is initialised.
+    reportError(error, { boundary: "paper", digest: error.digest });
   }, [error]);
 
   return (
